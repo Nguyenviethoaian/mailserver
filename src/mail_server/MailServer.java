@@ -1,12 +1,17 @@
 package mail_server;
 
 import java.awt.EventQueue;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.time.LocalDateTime;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.Color;
@@ -31,7 +36,7 @@ public class MailServer extends JFrame {
         });
     }
 
-    public MailServer() {
+    public MailServer() throws UnknownHostException {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setBounds(100, 100, 650, 450); // Resize the window
         contentPane = new JPanel();
@@ -54,7 +59,7 @@ public class MailServer extends JFrame {
         textFieldIP.setBounds(130, 60, 150, 25);
         contentPane.add(textFieldIP);
         textFieldIP.setColumns(10);
-        textFieldIP.setText("10.60.250.186");
+        textFieldIP.setText(InetAddress.getLocalHost().getHostAddress());
 
         JLabel lblPort = new JLabel("Port:");
         lblPort.setFont(new Font("Tahoma", Font.PLAIN, 14));
@@ -65,7 +70,7 @@ public class MailServer extends JFrame {
         textFieldPort.setBounds(130, 100, 150, 25);
         contentPane.add(textFieldPort);
         textFieldPort.setColumns(10);
-        textFieldPort.setText("45678");
+        textFieldPort.setText("8888");
 
         JButton btnStartServer = new JButton("Start Server");
         btnStartServer.setFont(new Font("Tahoma", Font.PLAIN, 14));
@@ -149,9 +154,15 @@ public class MailServer extends JFrame {
             case "SEND":
                 if (parts.length >= 2) {
                     String receiver = parts[1];
-                    String emailContent = message.substring(command.length() + receiver.length() + 2);  
-                    response = sendEmail(receiver, emailContent, accountName); 
+                    String sender = parts[2];
+                    String emailContent = message.substring(command.length() + receiver.length() +  sender.length() + 2);
+                    response = sendEmail(receiver, emailContent, sender); 
+                    String emailList= loginAndListEmails(receiver);
+                    textArea.append(emailList);
                 }
+                break;
+            case "LOAD":  
+                response = loadEmails(accountName); 
                 break;
             case "LOGIN":
                 response = loginAndListEmails(accountName);
@@ -180,9 +191,11 @@ public class MailServer extends JFrame {
         try {
             File accountFile = new File(accountFolder, accountName + "_info.txt");
             FileWriter accountWriter = new FileWriter(accountFile);
+            String time =  LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH-mm-ss"));
             accountWriter.write("Account: " + accountName + "\n");
             accountWriter.write("Password: " + password + "\n");
             accountWriter.write("IP Address: " + ipAddress + "\n");
+            accountWriter.write("Created At: " + time + "\n");
             accountWriter.write("Status: Welcome to our email service.");
             accountWriter.close();
 
@@ -199,7 +212,10 @@ public class MailServer extends JFrame {
     }
 
     private String sendEmail(String receiver, String emailContent, String sender) {
-        File receiverFolder = new File("D:/mailserver/" + receiver);  
+    	
+    	File receiverFolder = new File("D:/mailserver/" + receiver);
+        
+        
 
         if (!receiverFolder.exists()) {
             return "Receiver account not found!";
@@ -207,8 +223,9 @@ public class MailServer extends JFrame {
 
         
         try {
+        	String time =  LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH-mm-ss"));
             
-            File emailFile = new File(receiverFolder, "email_from_" + sender + "_" + System.currentTimeMillis() + ".txt");
+        	File emailFile = new File(receiverFolder, "email_from_" + sender + "_" + time+ ".txt");
 
             FileWriter writer = new FileWriter(emailFile);
             writer.write(emailContent);
@@ -220,7 +237,7 @@ public class MailServer extends JFrame {
     }
 
     private String loginAndListEmails(String accountName) {
-        String baseFolderPath = "D:/mailserver";  // Updated path
+        String baseFolderPath = "D:/mailserver"; 
         File accountFolder = new File(baseFolderPath, accountName);
 
         if (!accountFolder.exists()) {
@@ -238,5 +255,37 @@ public class MailServer extends JFrame {
         }
         return response.toString();
     }
+    
+
+    private String loadEmails(String accountName) {
+        String baseFolderPath = "D:/mailserver"; 
+        File accountFolder = new File(baseFolderPath, accountName);
+
+        if (!accountFolder.exists()) {
+            return "Account not found!";
+        }
+
+        File[] files = accountFolder.listFiles();
+        if (files == null || files.length == 0) {
+            return "No emails found!";
+        }
+
+        StringBuilder response = new StringBuilder("Emails in account " + accountName + ":\n");
+        for (File file : files) {
+            
+            if (file.isFile()) {
+                try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        response.append(line).append("\n");
+                    }
+                } catch (IOException e) {
+                    response.append("Error reading email file: ").append(file.getAbsolutePath()).append("\n");
+                }
+            }
+        }
+        return response.toString();
+    }
+
 }
 

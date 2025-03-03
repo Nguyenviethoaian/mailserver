@@ -1,8 +1,7 @@
 package mail_server;
+
 import java.awt.*;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
+import java.net.*;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 
@@ -58,6 +57,7 @@ public class MailClient extends JFrame {
         JButton buttonRegister = new JButton("Register");
         JButton buttonLogin = new JButton("Login");
         JButton buttonSendEmail = new JButton("Send Email");
+        JButton buttonLoadEmails = new JButton("Load Emails");
 
         textArea = new JTextArea();
         textArea.setEditable(false);
@@ -90,7 +90,8 @@ public class MailClient extends JFrame {
                         .addComponent(buttonConnect)
                         .addComponent(buttonRegister)
                         .addComponent(buttonLogin)
-                        .addComponent(buttonSendEmail)))
+                        .addComponent(buttonSendEmail)
+                        .addComponent(buttonLoadEmails)))
                 .addComponent(scrollPane)
         );
 
@@ -118,6 +119,7 @@ public class MailClient extends JFrame {
                     .addComponent(textFieldRecipient)
                     .addComponent(buttonSendEmail))
                 .addComponent(scrollPane)
+                .addComponent(buttonLoadEmails)
         );
 
         // Button event handlers
@@ -131,7 +133,7 @@ public class MailClient extends JFrame {
         buttonRegister.addActionListener(e -> {
             String accountName = textFieldAccount.getText();
             String password = textFieldPassword.getText();
-            String ipAddress = getLocalIP();  
+            String ipAddress = getLocalIP();
             sendCommand("REGISTER " + accountName + " " + password+ " " + ipAddress);
         });
 
@@ -147,8 +149,16 @@ public class MailClient extends JFrame {
             if (recipient.isEmpty()) {
                 JOptionPane.showMessageDialog(null, "Please enter the recipient account!");
             } else if (content != null && !content.isEmpty()) {
-                sendCommand("SEND " + recipient + " " + content);
+                sendCommand("SEND " + recipient + " "+ sender+ " " + content);
             }
+        });
+
+        
+        buttonLoadEmails.addActionListener(e -> {
+            String ipAddress = textFieldIP.getText();
+            int port = Integer.parseInt(textFieldPort.getText());
+            String accountName = textFieldAccount.getText();  
+            loadEmails(accountName, ipAddress, port);
         });
     }
 
@@ -179,20 +189,53 @@ public class MailClient extends JFrame {
             socket.receive(receivePacket);
 
             String response = new String(receivePacket.getData(), 0, receivePacket.getLength());
-            textArea.append("Server response: " + response + "\n");
+            textArea.append("Server response: \n" + response + "\n");
 
         } catch (Exception ex) {
             textArea.append("Error sending command: " + ex.getMessage() + "\n");
         }
     }
+
     private String getLocalIP() {
         try {
             InetAddress localHost = InetAddress.getLocalHost();
             return localHost.getHostAddress();
         } catch (Exception e) {
             e.printStackTrace();
-            return "Unable to get IP";  
+            return "Unable to get IP";
         }
     }
-}
+    
 
+    private void loadEmails(String accountName, String ipAddress, int port) {
+        try {
+            DatagramSocket socket = new DatagramSocket();
+            InetAddress serverAddress = InetAddress.getByName(ipAddress);
+
+            
+            String message = "LOAD " + accountName;
+            byte[] sendData = message.getBytes();
+
+          
+            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, serverAddress, port);
+            socket.send(sendPacket);
+
+            
+            byte[] receiveData = new byte[1024];
+            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+            socket.receive(receivePacket);
+
+            String response = new String(receivePacket.getData(), 0, receivePacket.getLength());
+
+          
+            textArea.append("Server response:\n" + response + "\n");
+
+            socket.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+            textArea.append("Error loading emails: " + e.getMessage() + "\n");
+        }
+    }
+
+
+}
